@@ -50,6 +50,8 @@ El servidor puede devolver los siguientes códigos HTTP en `POST /notifications`
 - **401 Unauthorized**: Autenticación fallida (API Key inválida o JWT inválido).
 - **500 Internal Server Error**: Error inesperado en el servidor.
 
+- **503 Service Unavailable**: La base de datos no está disponible o no se pudo conectar. En este caso el servicio responderá con `503` y un cuerpo JSON explicando que la conexión a la base de datos no está disponible.
+
 Nota: Según la especificación, el receptor debe confirmar la recepción del evento con `200` lo antes posible; por eso el servidor realiza validaciones básicas antes de confirmar y deja validaciones más estrictas para procesamiento asíncrono después del `200`.
 
 ## Ejemplos de payloads y comandos para recibir tipos de transacción

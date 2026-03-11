@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Notification {
+  id                   Int      @id @default(autoincrement())
+  paymentType          String
+  originBankReference  String
+  destinationBankReference String @map("destinyBankReference")
+  originBankCode       String
+  txHour               String
+  currencyCode         String
+  amount               String
+  txDate               String
+  txTimestamp          DateTime?
+  commerceId           String?
+  commercePhone        String?
+  clientPhone          String?
+  concept              String?
+  debtorAccount        String?
+  debtorId             String?
+  creditorAccount      String?
+  receivedAt           DateTime @default(now())
+  processed            Boolean  @default(false)
+  validationErrors     String?
+  raw                  Json?
+
+  @@map("notifications")
+}
+
+model Log {
+  id         Int      @id @default(autoincrement())
+  level      String
+  statusCode Int?
+  endpoint   String?
+  message    String
+  details    Json?
+  createdAt  DateTime @default(now())
+  @@map("notification_error_logs")
+}
