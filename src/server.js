@@ -6,6 +6,8 @@ require('dotenv').config();
 const app = express();
 app.use(express.json());
 
+const pkg = require('../package.json');
+
 const API_KEY = process.env.API_KEY || 'test-api-key';
 const JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
 
@@ -69,6 +71,25 @@ function verifyJwt(req) {
 }
 
 app.get('/ping', (req, res) => res.sendStatus(200));
+
+// Root page: show running version and basic runtime info
+app.get('/', (req, res) => {
+  const version = (pkg && pkg.version) ? pkg.version : 'dev';
+  const now = new Date();
+  const uptimeSec = Math.floor(process.uptime());
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!doctype html>
+  <html>
+    <head><meta charset="utf-8"><title>NotificationPush - Status</title></head>
+    <body>
+      <h1>NotificationPush</h1>
+      <p><strong>Version:</strong> ${version}</p>
+      <p><strong>Now:</strong> ${now.toISOString()}</p>
+      <p><strong>Uptime (s):</strong> ${uptimeSec}</p>
+      <p><a href="/health">Health</a> • <a href="/ping">Ping</a></p>
+    </body>
+  </html>`);
+});
 
 app.get('/health', (req, res) => {
   if (!dbAvailable) return res.status(503).json({ status: 'unavailable', db: false });
