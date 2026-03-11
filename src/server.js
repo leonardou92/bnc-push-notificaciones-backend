@@ -6,6 +6,14 @@ const path = require('path');
 
 const app = express();
 app.use(express.json());
+// Simple CORS middleware to allow frontend requests (including preflight)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-api-key, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 // Serve static UI files from /public
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -343,6 +351,61 @@ app.post('/notifications', (req, res) => {
       console.log('DB not available at processing time; skipping storage for payload:', payload.OriginBankReference || payload.DestinyBankReference);
     }
   });
+});
+
+// Endpoint para consultar registros de notificaciones
+app.get('/notifications', async (req, res) => {
+  if (!dbAvailable) return res.status(503).json({ error: 'Service Unavailable: database connection not available' });
+
+  if (!verifyApiKey(req) && !verifyJwt(req)) {
+    await writeLog('ERROR', 401, 'Unauthorized: invalid API key or token', { headers: req.headers }, '/notifications');
+    return res.status(401).json({ error: 'Unauthorized: invalid API key or token' });
+  }
+
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '50', 10) || 50, 1000);
+    const skip = Math.max(parseInt(req.query.offset || req.query.skip || '0', 10) || 0, 0);
+    const where = {};
+    if (req.query.processed !== undefined) where.processed = req.query.processed === 'true' || req.query.processed === '1';
+    if (req.query.originBankReference) where.originBankReference = String(req.query.originBankReference);
+    if (req.query.destinationBankReference) where.destinationBankReference = String(req.query.destinationBankReference);
+    if (req.query.txDate) where.txDate = String(req.query.txDate);
+    if (req.query.amount) where.amount = String(req.query.amount);
+    if (req.query.id) where.id = parseInt(req.query.id, 10);
+
+    const rows = await prisma.notification.findMany({ where, orderBy: { receivedAt: 'desc' }, take: limit, skip });
+    return res.json({ count: rows.length, rows });
+  } catch (e) {
+    console.error('Failed to fetch notifications:', e.message);
+    await writeLog('ERROR', 500, 'Failed to fetch notifications', { error: e.message }, '/notifications');
+    return res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+// Endpoint para consultar logs de notificaciones
+app.get('/logs', async (req, res) => {
+  if (!dbAvailable) return res.status(503).json({ error: 'Service Unavailable: database connection not available' });
+
+  if (!verifyApiKey(req) && !verifyJwt(req)) {
+    await writeLog('ERROR', 401, 'Unauthorized: invalid API key or token', { headers: req.headers }, '/logs');
+    return res.status(401).json({ error: 'Unauthorized: invalid API key or token' });
+  }
+
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '100', 10) || 100, 2000);
+    const skip = Math.max(parseInt(req.query.offset || req.query.skip || '0', 10) || 0, 0);
+    const where = {};
+    if (req.query.level) where.level = String(req.query.level).toUpperCase();
+    if (req.query.endpoint) where.endpoint = String(req.query.endpoint);
+    if (req.query.statusCode) where.statusCode = parseInt(req.query.statusCode, 10);
+
+    const rows = await prisma.log.findMany({ where, orderBy: { createdAt: 'desc' }, take: limit, skip });
+    return res.json({ count: rows.length, rows });
+  } catch (e) {
+    console.error('Failed to fetch logs:', e.message);
+    await writeLog('ERROR', 500, 'Failed to fetch logs', { error: e.message }, '/logs');
+    return res.status(500).json({ error: 'Failed to fetch logs' });
+  }
 });
 
 // Graceful shutdown

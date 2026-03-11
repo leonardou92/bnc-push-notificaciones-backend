@@ -7,6 +7,7 @@
     "start": "node src/index.js",
     "serve": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "build": "echo \"no build\"",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:dbpush": "prisma db push",

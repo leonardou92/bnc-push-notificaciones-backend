@@ -1,0 +1,117 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "NotificationPush API",
+    "version": "1.0.0",
+    "description": "API para consultar notificaciones y logs de NotificationPush"
+  },
+  "servers": [{ "url": "/" }],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": { "type": "apiKey", "in": "header", "name": "x-api-key" },
+      "BearerAuth": { "type": "http", "scheme": "bearer" }
+    },
+    "schemas": {
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "paymentType": { "type": "string" },
+          "originBankReference": { "type": "string" },
+          "destinationBankReference": { "type": "string" },
+          "originBankCode": { "type": "string" },
+          "txHour": { "type": "string" },
+          "currencyCode": { "type": "string" },
+          "amount": { "type": "string" },
+          "txDate": { "type": "string" },
+          "txTimestamp": { "type": "string", "format": "date-time" },
+          "commerceId": { "type": "string" },
+          "commercePhone": { "type": "string" },
+          "clientPhone": { "type": "string" },
+          "concept": { "type": "string" },
+          "debtorAccount": { "type": "string" },
+          "debtorId": { "type": "string" },
+          "creditorAccount": { "type": "string" },
+          "receivedAt": { "type": "string", "format": "date-time" },
+          "processed": { "type": "boolean" },
+          "validationErrors": { "type": "string" },
+          "raw": { "type": "object" }
+        }
+      },
+      "Log": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "level": { "type": "string" },
+          "statusCode": { "type": "integer" },
+          "endpoint": { "type": "string" },
+          "message": { "type": "string" },
+          "details": { "type": "object" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  },
+  "security": [ { "ApiKeyAuth": [] }, { "BearerAuth": [] } ],
+  "paths": {
+    "/notifications": {
+      "get": {
+        "summary": "Listar notificaciones",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } },
+          { "name": "processed", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "originBankReference", "in": "query", "schema": { "type": "string" } },
+          { "name": "destinationBankReference", "in": "query", "schema": { "type": "string" } },
+          { "name": "txDate", "in": "query", "schema": { "type": "string" } },
+          { "name": "amount", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de notificaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "rows": { "type": "array", "items": { "$ref": "#/components/schemas/Notification" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logs": {
+      "get": {
+        "summary": "Listar logs de notificaciones",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 100 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } },
+          { "name": "level", "in": "query", "schema": { "type": "string" } },
+          { "name": "endpoint", "in": "query", "schema": { "type": "string" } },
+          { "name": "statusCode", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "rows": { "type": "array", "items": { "$ref": "#/components/schemas/Log" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
