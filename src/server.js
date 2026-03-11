@@ -364,8 +364,8 @@ app.get('/notifications', async (req, res) => {
 
   try {
     // pagination: prefer page-based pagination of 20 items per page
-    const perPage = 20;
-    const limitQuery = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit, 10) || perPage, 1), 1000) : perPage;
+    const perPage = 20; // fixed page size: 20 items per page
+    const limitQuery = perPage;
     const page = req.query.page ? Math.max(parseInt(req.query.page, 10) || 1, 1) : 1;
     const skip = req.query.offset ? Math.max(parseInt(req.query.offset, 10) || 0, 0) : (page - 1) * limitQuery;
 
@@ -377,8 +377,12 @@ app.get('/notifications', async (req, res) => {
     if (req.query.amount) where.amount = String(req.query.amount);
     if (req.query.id) where.id = parseInt(req.query.id, 10);
 
-    const rows = await prisma.notification.findMany({ where, orderBy: { receivedAt: 'desc' }, take: limitQuery, skip });
-    return res.json({ page, perPage: limitQuery, count: rows.length, rows });
+    const [total, rows] = await Promise.all([
+      prisma.notification.count({ where }),
+      prisma.notification.findMany({ where, orderBy: { receivedAt: 'desc' }, take: limitQuery, skip })
+    ]);
+    const totalPages = Math.ceil(total / limitQuery);
+    return res.json({ page, perPage: limitQuery, total, totalPages, count: rows.length, rows });
   } catch (e) {
     console.error('Failed to fetch notifications:', e.message);
     await writeLog('ERROR', 500, 'Failed to fetch notifications', { error: e.message }, '/notifications');
@@ -416,8 +420,8 @@ app.get('/logs', async (req, res) => {
   }
 
   try {
-    const perPage = 20;
-    const limitQuery = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit, 10) || perPage, 1), 2000) : perPage;
+    const perPage = 20; // fixed page size: 20 items per page
+    const limitQuery = perPage;
     const page = req.query.page ? Math.max(parseInt(req.query.page, 10) || 1, 1) : 1;
     const skip = req.query.offset ? Math.max(parseInt(req.query.offset, 10) || 0, 0) : (page - 1) * limitQuery;
 
@@ -426,8 +430,12 @@ app.get('/logs', async (req, res) => {
     if (req.query.endpoint) where.endpoint = String(req.query.endpoint);
     if (req.query.statusCode) where.statusCode = parseInt(req.query.statusCode, 10);
 
-    const rows = await prisma.log.findMany({ where, orderBy: { createdAt: 'desc' }, take: limitQuery, skip });
-    return res.json({ page, perPage: limitQuery, count: rows.length, rows });
+    const [total, rows] = await Promise.all([
+      prisma.log.count({ where }),
+      prisma.log.findMany({ where, orderBy: { createdAt: 'desc' }, take: limitQuery, skip })
+    ]);
+    const totalPages = Math.ceil(total / limitQuery);
+    return res.json({ page, perPage: limitQuery, total, totalPages, count: rows.length, rows });
   } catch (e) {
     console.error('Failed to fetch logs:', e.message);
     await writeLog('ERROR', 500, 'Failed to fetch logs', { error: e.message }, '/logs');

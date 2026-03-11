@@ -76,6 +76,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "page": { "type": "integer" },
+                    "perPage": { "type": "integer" },
+                    "total": { "type": "integer", "description": "Total items matching the filter" },
+                    "totalPages": { "type": "integer" },
                     "count": { "type": "integer" },
                     "rows": { "type": "array", "items": { "$ref": "#/components/schemas/Notification" } }
                   }
@@ -118,6 +122,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "page": { "type": "integer" },
+                    "perPage": { "type": "integer" },
+                    "total": { "type": "integer", "description": "Total items matching the filter" },
+                    "totalPages": { "type": "integer" },
                     "count": { "type": "integer" },
                     "rows": { "type": "array", "items": { "$ref": "#/components/schemas/Log" } }
                   }
