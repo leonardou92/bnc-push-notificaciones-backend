@@ -48,145 +48,129 @@ El servidor puede devolver los siguientes códigos HTTP en `POST /notifications`
 - **200 OK**: Acknowledgement inmediato de recepción (la validación completa se realiza en segundo plano).
 - **400 Bad Request**: Faltan campos obligatorios o formato inválido en campos básicos (ej. `TxHour`, `TxDate`, `Amount`). El cuerpo de la respuesta incluye un objeto con `error` y detalles.
 - **401 Unauthorized**: Autenticación fallida (API Key inválida o JWT inválido).
-- **500 Internal Server Error**: Error inesperado en el servidor.
+# BNC NotificationPush - Proyecto Node
 
-- **503 Service Unavailable**: La base de datos no está disponible o no se pudo conectar. En este caso el servicio responderá con `503` y un cuerpo JSON explicando que la conexión a la base de datos no está disponible.
+Este repositorio contiene una implementación de ejemplo del receptor BNC NotificationPush y la especificación en `docs/BNC-NotificationPush.md`.
 
-Nota: Según la especificación, el receptor debe confirmar la recepción del evento con `200` lo antes posible; por eso el servidor realiza validaciones básicas antes de confirmar y deja validaciones más estrictas para procesamiento asíncrono después del `200`.
+Requisitos
+- Node.js 18+ instalado
+- Una base de datos MySQL accesible (configurar `DATABASE_URL` en `.env`)
 
-## Cambios recientes y notas de integración
-
-- Se añadió un campo `txTimestamp` en la base de datos (DateTime) que combina `TxDate` (yyyyMMdd) y `TxHour` (HHMM). El servidor calculará `txTimestamp` automáticamente si recibe ambos campos.
-- El campo de referencia destino en el modelo ahora se llama `destinationBankReference` en el código (mapeado a la columna histórica `destinyBankReference` para preservar datos existentes). El servidor acepta `DestinationBankReference` y `DestinyBankReference` en el payload por compatibilidad.
-- Regla de duplicados: para evitar inserciones múltiples la validación compara: `OriginBankReference` (últimos 6 dígitos), `TxDate` y `Amount`. Si ya existe una fila con la misma combinación, el registro NO se inserta en `notifications` y se escribe un log de error en `notification_error_logs`.
-
-## Migración / comandos Prisma
-
-Después de actualizar el esquema Prisma (se agregó `txTimestamp` y renombrado lógico de campo), ejecuta estos comandos localmente para aplicar cambios y regenerar el cliente:
+Instalación
 
 ```bash
+npm install
 npx prisma generate
+```
+
+Configuración
+
+- Copia `.env.example` a `.env` y ajusta `DATABASE_URL`, `API_KEY` y `JWT_SECRET` según tu entorno.
+- Si necesitas aplicar el esquema a la base de datos local:
+
+```bash
 npx prisma db push
 ```
 
-Si usas migraciones, genera y aplica migración según tu flujo habitual.
+Uso
 
-## Pruebas rápidas (duplicados)
+- Iniciar servidor (producción):
 
-1. Inicia el servidor en modo desarrollo:
+```bash
+npm run serve
+```
+
+- Modo desarrollo (con reinicio automático):
 
 ```bash
 npm run dev
 ```
 
-2. Envía dos `POST /notifications` con los mismos valores para `Amount`, `TxDate` y los mismos últimos 6 dígitos en `OriginBankReference`.
+Endpoints principales
 
-3. Observa la consola: el servidor imprimirá líneas de debug con prefijo `Duplicate check:` cuando busque candidatos, y `Notification stored in DB:` cuando almacene.
+- `GET /` — Página de estado rápida (muestra versión, hora y uptime).
+- `GET /ping` — Responde 200 OK.
+- `GET /health` — Devuelve estado de la conexión a la base de datos.
+- `POST /notifications` — Endpoint que recibe las notificaciones. Requiere `x-api-key` o `Authorization: Bearer <token>`.
 
-Si el segundo envío es detectado como duplicado verás un log con `Duplicate detected` y no habrá inserción adicional en la tabla `notifications` (sí habrá un registro en `notification_error_logs`).
+Comportamiento clave
 
-## Ejemplos de payloads y comandos para recibir tipos de transacción
+- El endpoint `POST /notifications` responde `200` inmediatamente (acknowledgement). La validación y el almacenamiento se realizan asíncronamente.
+- Si la base de datos no está disponible la API responde `503` en lugar de `200`.
+- Las validaciones posteriores pueden generar un registro en la tabla de logs `notification_error_logs` y almacenar la notificación con `processed=false` si hay errores de validación.
+- Regla de duplicados: el servicio evita insertar duplicados comparando `OriginBankReference` (últimos 6 dígitos), `TxDate` y `Amount`. Si se detecta duplicado, no se inserta una nueva notificación y se crea una entrada de error en `notification_error_logs`.
 
-A continuación hay ejemplos de objetos JSON que el endpoint `POST /notifications` puede recibir, y ejemplos `curl` para probarlos.
+Ejemplos de payloads
 
-1) P2P
-
-Payload (P2P):
+P2P (ejemplo):
 
 ```json
 {
-	"PaymentType": "P2P",
-	"OriginBankReference": "ref123",
-	"DestinyBankReference": "bnc-ref-456",
-	"OriginBankCode": "0001",
-	"TxHour": "1530",
-	"CurrencyCode": "0928",
-	"Amount": "100.00",
-	"TxDate": "20250311",
-	"CommerceID": "J-12345678-9",
-	"CommercePhone": "00584141230000",
-	"ClientPhone": "00584141234567",
-	"Concept": "Pago movil"
+  "PaymentType": "P2P",
+  "OriginBankReference": "ref123",
+  "DestinyBankReference": "bnc-ref-456",
+  "OriginBankCode": "0001",
+  "TxHour": "1530",
+  "CurrencyCode": "0928",
+  "Amount": "100.00",
+  "TxDate": "20250311",
+  "CommerceID": "J-12345678-9",
+  "CommercePhone": "00584141230000",
+  "ClientPhone": "00584141234567",
+  "Concept": "Pago movil"
 }
 ```
 
-Ejemplo `curl` con `x-api-key`:
-
-```bash
-curl -X POST http://localhost:3000/notifications \
-	-H "Content-Type: application/json" \
-	-H "x-api-key: your_api_key_here" \
-	-d '{"PaymentType":"P2P","Amount":"100.00","OriginBankReference":"ref123","ClientPhone":"00584141234567"}'
-```
-
-Ejemplo `curl` con JWT:
-
-```bash
-curl -X POST http://localhost:3000/notifications \
-	-H "Content-Type: application/json" \
-	-H "Authorization: Bearer YOUR_JWT_TOKEN" \
-	-d '{"PaymentType":"P2P","Amount":"100.00","OriginBankReference":"ref123","ClientPhone":"00584141234567"}'
-```
-
-2) DEP (Depósito)
-
-Payload (DEP):
+DEP (ejemplo):
 
 ```json
 {
-	"PaymentType": "DEP",
-	"OriginBankReference": "dep-ref-001",
-	"DestinyBankReference": "bnc-ref-789",
-	"OriginBankCode": "0002",
-	"TxHour": "0905",
-	"CurrencyCode": "0928",
-	"Amount": "2500.50",
-	"TxDate": "20250311",
-	"CommerceID": "J-98765432-1",
-	"CommercePhone": "00584141230001",
-	"DebtorAccount": "01234567890123456789",
-	"DebtorID": "V012345678"
+  "PaymentType": "DEP",
+  "OriginBankReference": "dep-ref-001",
+  "DestinyBankReference": "bnc-ref-789",
+  "OriginBankCode": "0002",
+  "TxHour": "0905",
+  "CurrencyCode": "0928",
+  "Amount": "2500.50",
+  "TxDate": "20250311",
+  "CommerceID": "J-98765432-1",
+  "CommercePhone": "00584141230001",
+  "DebtorAccount": "01234567890123456789",
+  "DebtorID": "V012345678"
 }
 ```
 
-Ejemplo `curl`:
-
-```bash
-curl -X POST http://localhost:3000/notifications \
-	-H "Content-Type: application/json" \
-	-H "x-api-key: your_api_key_here" \
-	-d '{"PaymentType":"DEP","Amount":"2500.50","OriginBankReference":"dep-ref-001","DebtorAccount":"01234567890123456789"}'
-```
-
-3) TRF (Transferencia)
-
-Payload (TRF):
+TRF (ejemplo):
 
 ```json
 {
-	"PaymentType": "TRF",
-	"OriginBankReference": "trf-ref-002",
-	"DestinyBankReference": "bnc-ref-101",
-	"OriginBankCode": "0003",
-	"TxHour": "1145",
-	"CurrencyCode": "0928",
-	"Amount": "500.00",
-	"TxDate": "20250311",
-	"CommerceID": "J-55555555-5",
+  "PaymentType": "TRF",
+  "OriginBankReference": "trf-ref-002",
+  "DestinyBankReference": "bnc-ref-101",
+  "OriginBankCode": "0003",
+  "TxHour": "1145",
+  "CurrencyCode": "0928",
+  "Amount": "500.00",
+  "TxDate": "20250311",
+  "CommerceID": "J-55555555-5",
+  "CommercePhone": "00584141230002",
+  "DebtorAccount": "09876543210987654321",
+  "DebtorID": "J000152369",
+  "CreditorAccount": "12345098761234509876"
+}
+```
+
+Ejemplo `curl` básico:
+
+```bash
+curl -X POST http://localhost:3000/notifications \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your_api_key_here" \
+  -d '{"PaymentType":"DEP","Amount":"2500.50","OriginBankReference":"dep-ref-001","DebtorAccount":"01234567890123456789"}'
+```
+
+Notas finales
+
+- Ajusta los campos y encabezados según tu integración. Para pruebas locales asegúrate de setear `DATABASE_URL` en `.env` y ejecutar `npx prisma db push` si usas la base de datos local.
+- Para consultas directas a la base de datos revisa las tablas `notifications` y `notification_error_logs`.
 	"CommercePhone": "00584141230002",
-	"DebtorAccount": "09876543210987654321",
-	"DebtorID": "J000152369",
-	"CreditorAccount": "12345098761234509876"
-}
-```
-
-Ejemplo `curl`:
-
-```bash
-curl -X POST http://localhost:3000/notifications \
-	-H "Content-Type: application/json" \
-	-H "x-api-key: your_api_key_here" \
-	-d '{"PaymentType":"TRF","Amount":"500.00","OriginBankReference":"trf-ref-002","DebtorAccount":"09876543210987654321","CreditorAccount":"12345098761234509876"}'
-```
-
-Nota: Ajusta los campos según tu sistema receptor y recuerda responder `200` inmediatamente; las validaciones y lógica interna deben ejecutarse después de la confirmación inicial.
