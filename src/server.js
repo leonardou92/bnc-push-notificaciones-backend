@@ -307,7 +307,8 @@ app.post('/notifications', (req, res) => {
           writeLog('ERROR', 500, 'Failed to store invalid notification', { error: e.message, payload }, '/notifications');
         }
       }
-      // (duplicate check already performed before validations)
+      // Stored invalid notification; stop processing to avoid duplicate insert
+      return;
     }
 
     if (dbAvailable) {
