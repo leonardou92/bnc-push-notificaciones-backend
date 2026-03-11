@@ -173,4 +173,3 @@ Notas finales
 
 - Ajusta los campos y encabezados según tu integración. Para pruebas locales asegúrate de setear `DATABASE_URL` en `.env` y ejecutar `npx prisma db push` si usas la base de datos local.
 - Para consultas directas a la base de datos revisa las tablas `notifications` y `notification_error_logs`.
-	"CommercePhone": "00584141230002",
