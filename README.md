@@ -54,6 +54,37 @@ El servidor puede devolver los siguientes códigos HTTP en `POST /notifications`
 
 Nota: Según la especificación, el receptor debe confirmar la recepción del evento con `200` lo antes posible; por eso el servidor realiza validaciones básicas antes de confirmar y deja validaciones más estrictas para procesamiento asíncrono después del `200`.
 
+## Cambios recientes y notas de integración
+
+- Se añadió un campo `txTimestamp` en la base de datos (DateTime) que combina `TxDate` (yyyyMMdd) y `TxHour` (HHMM). El servidor calculará `txTimestamp` automáticamente si recibe ambos campos.
+- El campo de referencia destino en el modelo ahora se llama `destinationBankReference` en el código (mapeado a la columna histórica `destinyBankReference` para preservar datos existentes). El servidor acepta `DestinationBankReference` y `DestinyBankReference` en el payload por compatibilidad.
+- Regla de duplicados: para evitar inserciones múltiples la validación compara: `OriginBankReference` (últimos 6 dígitos), `TxDate` y `Amount`. Si ya existe una fila con la misma combinación, el registro NO se inserta en `notifications` y se escribe un log de error en `notification_error_logs`.
+
+## Migración / comandos Prisma
+
+Después de actualizar el esquema Prisma (se agregó `txTimestamp` y renombrado lógico de campo), ejecuta estos comandos localmente para aplicar cambios y regenerar el cliente:
+
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+Si usas migraciones, genera y aplica migración según tu flujo habitual.
+
+## Pruebas rápidas (duplicados)
+
+1. Inicia el servidor en modo desarrollo:
+
+```bash
+npm run dev
+```
+
+2. Envía dos `POST /notifications` con los mismos valores para `Amount`, `TxDate` y los mismos últimos 6 dígitos en `OriginBankReference`.
+
+3. Observa la consola: el servidor imprimirá líneas de debug con prefijo `Duplicate check:` cuando busque candidatos, y `Notification stored in DB:` cuando almacene.
+
+Si el segundo envío es detectado como duplicado verás un log con `Duplicate detected` y no habrá inserción adicional en la tabla `notifications` (sí habrá un registro en `notification_error_logs`).
+
 ## Ejemplos de payloads y comandos para recibir tipos de transacción
 
 A continuación hay ejemplos de objetos JSON que el endpoint `POST /notifications` puede recibir, y ejemplos `curl` para probarlos.
