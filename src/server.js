@@ -363,8 +363,12 @@ app.get('/notifications', async (req, res) => {
   }
 
   try {
-    const limit = Math.min(parseInt(req.query.limit || '50', 10) || 50, 1000);
-    const skip = Math.max(parseInt(req.query.offset || req.query.skip || '0', 10) || 0, 0);
+    // pagination: prefer page-based pagination of 20 items per page
+    const perPage = 20;
+    const limitQuery = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit, 10) || perPage, 1), 1000) : perPage;
+    const page = req.query.page ? Math.max(parseInt(req.query.page, 10) || 1, 1) : 1;
+    const skip = req.query.offset ? Math.max(parseInt(req.query.offset, 10) || 0, 0) : (page - 1) * limitQuery;
+
     const where = {};
     if (req.query.processed !== undefined) where.processed = req.query.processed === 'true' || req.query.processed === '1';
     if (req.query.originBankReference) where.originBankReference = String(req.query.originBankReference);
@@ -373,12 +377,32 @@ app.get('/notifications', async (req, res) => {
     if (req.query.amount) where.amount = String(req.query.amount);
     if (req.query.id) where.id = parseInt(req.query.id, 10);
 
-    const rows = await prisma.notification.findMany({ where, orderBy: { receivedAt: 'desc' }, take: limit, skip });
-    return res.json({ count: rows.length, rows });
+    const rows = await prisma.notification.findMany({ where, orderBy: { receivedAt: 'desc' }, take: limitQuery, skip });
+    return res.json({ page, perPage: limitQuery, count: rows.length, rows });
   } catch (e) {
     console.error('Failed to fetch notifications:', e.message);
     await writeLog('ERROR', 500, 'Failed to fetch notifications', { error: e.message }, '/notifications');
     return res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+// Obtener una notificación por id
+app.get('/notifications/:id', async (req, res) => {
+  if (!dbAvailable) return res.status(503).json({ error: 'Service Unavailable: database connection not available' });
+  if (!verifyApiKey(req) && !verifyJwt(req)) {
+    await writeLog('ERROR', 401, 'Unauthorized: invalid API key or token', { headers: req.headers }, '/notifications/:id');
+    return res.status(401).json({ error: 'Unauthorized: invalid API key or token' });
+  }
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const row = await prisma.notification.findUnique({ where: { id } });
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    return res.json(row);
+  } catch (e) {
+    console.error('Failed to fetch notification by id:', e.message);
+    await writeLog('ERROR', 500, 'Failed to fetch notification by id', { error: e.message }, '/notifications/:id');
+    return res.status(500).json({ error: 'Failed to fetch notification' });
   }
 });
 
@@ -392,19 +416,42 @@ app.get('/logs', async (req, res) => {
   }
 
   try {
-    const limit = Math.min(parseInt(req.query.limit || '100', 10) || 100, 2000);
-    const skip = Math.max(parseInt(req.query.offset || req.query.skip || '0', 10) || 0, 0);
+    const perPage = 20;
+    const limitQuery = req.query.limit ? Math.min(Math.max(parseInt(req.query.limit, 10) || perPage, 1), 2000) : perPage;
+    const page = req.query.page ? Math.max(parseInt(req.query.page, 10) || 1, 1) : 1;
+    const skip = req.query.offset ? Math.max(parseInt(req.query.offset, 10) || 0, 0) : (page - 1) * limitQuery;
+
     const where = {};
     if (req.query.level) where.level = String(req.query.level).toUpperCase();
     if (req.query.endpoint) where.endpoint = String(req.query.endpoint);
     if (req.query.statusCode) where.statusCode = parseInt(req.query.statusCode, 10);
 
-    const rows = await prisma.log.findMany({ where, orderBy: { createdAt: 'desc' }, take: limit, skip });
-    return res.json({ count: rows.length, rows });
+    const rows = await prisma.log.findMany({ where, orderBy: { createdAt: 'desc' }, take: limitQuery, skip });
+    return res.json({ page, perPage: limitQuery, count: rows.length, rows });
   } catch (e) {
     console.error('Failed to fetch logs:', e.message);
     await writeLog('ERROR', 500, 'Failed to fetch logs', { error: e.message }, '/logs');
     return res.status(500).json({ error: 'Failed to fetch logs' });
+  }
+});
+
+// Obtener un log por id
+app.get('/logs/:id', async (req, res) => {
+  if (!dbAvailable) return res.status(503).json({ error: 'Service Unavailable: database connection not available' });
+  if (!verifyApiKey(req) && !verifyJwt(req)) {
+    await writeLog('ERROR', 401, 'Unauthorized: invalid API key or token', { headers: req.headers }, '/logs/:id');
+    return res.status(401).json({ error: 'Unauthorized: invalid API key or token' });
+  }
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const row = await prisma.log.findUnique({ where: { id } });
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    return res.json(row);
+  } catch (e) {
+    console.error('Failed to fetch log by id:', e.message);
+    await writeLog('ERROR', 500, 'Failed to fetch log by id', { error: e.message }, '/logs/:id');
+    return res.status(500).json({ error: 'Failed to fetch log' });
   }
 });
 

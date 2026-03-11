@@ -58,14 +58,15 @@
       "get": {
         "summary": "Listar notificaciones",
         "parameters": [
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
-          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } },
-          { "name": "processed", "in": "query", "schema": { "type": "boolean" } },
-          { "name": "id", "in": "query", "schema": { "type": "integer" } },
-          { "name": "originBankReference", "in": "query", "schema": { "type": "string" } },
-          { "name": "destinationBankReference", "in": "query", "schema": { "type": "string" } },
-          { "name": "txDate", "in": "query", "schema": { "type": "string" } },
-          { "name": "amount", "in": "query", "schema": { "type": "string" } }
+            { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 }, "description": "Page number (1-based), default 1" },
+            { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 }, "description": "Items per page (default 20)" },
+            { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 }, "description": "Alternate offset-based pagination" },
+            { "name": "processed", "in": "query", "schema": { "type": "boolean" } },
+            { "name": "id", "in": "query", "schema": { "type": "integer" } },
+            { "name": "originBankReference", "in": "query", "schema": { "type": "string" } },
+            { "name": "destinationBankReference", "in": "query", "schema": { "type": "string" } },
+            { "name": "txDate", "in": "query", "schema": { "type": "string" } },
+            { "name": "amount", "in": "query", "schema": { "type": "string" } }
         ],
         "responses": {
           "200": {
@@ -85,15 +86,29 @@
         }
       }
     },
+      "/notifications/{id}": {
+        "get": {
+          "summary": "Obtener notificación por id",
+          "parameters": [
+            { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+          ],
+          "responses": {
+            "200": { "description": "Notificación", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Notification" } } } },
+            "404": { "description": "No encontrada" },
+            "401": { "description": "Unauthorized" }
+          }
+        }
+      },
     "/logs": {
       "get": {
         "summary": "Listar logs de notificaciones",
         "parameters": [
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 100 } },
-          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } },
-          { "name": "level", "in": "query", "schema": { "type": "string" } },
-          { "name": "endpoint", "in": "query", "schema": { "type": "string" } },
-          { "name": "statusCode", "in": "query", "schema": { "type": "integer" } }
+            { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 }, "description": "Page number (1-based), default 1" },
+            { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 }, "description": "Items per page (default 20)" },
+            { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 }, "description": "Alternate offset-based pagination" },
+            { "name": "level", "in": "query", "schema": { "type": "string" } },
+            { "name": "endpoint", "in": "query", "schema": { "type": "string" } },
+            { "name": "statusCode", "in": "query", "schema": { "type": "integer" } }
         ],
         "responses": {
           "200": {
@@ -113,5 +128,18 @@
         }
       }
     }
+      "/logs/{id}": {
+        "get": {
+          "summary": "Obtener log por id",
+          "parameters": [
+            { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+          ],
+          "responses": {
+            "200": { "description": "Log", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Log" } } } },
+            "404": { "description": "No encontrado" },
+            "401": { "description": "Unauthorized" }
+          }
+        }
+      }
   }
 }
