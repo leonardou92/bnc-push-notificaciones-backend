@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NotificationPush • Status</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <div class="brand">
+        <div class="logo">NP</div>
+        <div class="title">
+          <h1>NotificationPush</h1>
+          <p class="tag">Webhook processor • Push notificaciones</p>
+        </div>
+      </div>
+
+      <div class="meta">
+        <div class="meta-row"><strong>Versión:</strong> <span id="version">—</span></div>
+        <div class="meta-row"><strong>Ahora:</strong> <span id="now">—</span></div>
+        <div class="meta-row"><strong>Uptime (s):</strong> <span id="uptime">—</span></div>
+        <div class="meta-row status-row hidden"><strong>Servicio:</strong>
+          <span class="service">
+            <span id="service-indicator" class="dot"></span>
+            <span id="service-text"></span>
+          </span>
+        </div>
+      </div>
+
+      <div class="links">
+        <button class="btn" id="btn-health">Health</button>
+        <button class="btn ghost" id="btn-ping">Ping</button>
+      </div>
+
+      <div id="action-result" class="action-result" aria-live="polite"></div>
+
+    </section>
+  </main>
+
+  <script>
+    let uptimeCounter = 0;
+    let uptimeTimer = null;
+
+    function formatTimeISO(date) {
+      return new Date(date).toLocaleString();
+    }
+
+    function updateClock() {
+      document.getElementById('now').textContent = formatTimeISO(Date.now());
+    }
+
+    function startUptimeTicker() {
+      if (uptimeTimer) clearInterval(uptimeTimer);
+      uptimeTimer = setInterval(() => {
+        uptimeCounter = uptimeCounter + 1;
+        document.getElementById('uptime').textContent = String(uptimeCounter);
+      }, 1000);
+    }
+
+    async function refreshMeta() {
+      try {
+        const res = await fetch('/meta');
+        if (!res.ok) throw new Error('no meta');
+        const j = await res.json();
+        document.getElementById('version').textContent = j.version || 'dev';
+        // use server-provided uptime as base
+        uptimeCounter = Number.isFinite(j.uptimeSec) ? j.uptimeSec : 0;
+        document.getElementById('uptime').textContent = String(uptimeCounter);
+        // keep service row hidden until user triggers health/ping
+        document.querySelector('.status-row').classList.add('hidden');
+        startUptimeTicker();
+      } catch (e) {
+        document.getElementById('version').textContent = 'error';
+        document.getElementById('uptime').textContent = '-';
+      }
+    }
+
+    function showAction(text, ok = true) {
+      const el = document.getElementById('action-result');
+      el.textContent = text;
+      el.classList.remove('show');
+      // force reflow to restart animation
+      void el.offsetWidth;
+      el.classList.add('show');
+      if (ok) el.classList.add('ok'); else el.classList.remove('ok');
+      setTimeout(() => { el.classList.remove('show'); }, 4000);
+    }
+
+    async function callHealth() {
+      try {
+        const res = await fetch('/health');
+        const json = await res.json();
+        if (res.ok && json && json.status === 'ok') {
+              document.querySelector('.status-row').classList.remove('hidden');
+              document.getElementById('service-indicator').classList.add('ok');
+              document.getElementById('service-indicator').classList.remove('err');
+              document.getElementById('service-text').textContent = 'ok';
+          showAction('Health: OK', true);
+        } else {
+          document.querySelector('.status-row').classList.remove('hidden');
+          document.getElementById('service-indicator').classList.add('err');
+          document.getElementById('service-text').textContent = JSON.stringify(json || res.status);
+          showAction('Health: unavailable', false);
+        }
+      } catch (e) {
+        document.querySelector('.status-row').classList.remove('hidden');
+          document.getElementById('service-indicator').classList.add('err');
+          document.getElementById('service-text').textContent = 'error';
+        showAction('Health request failed', false);
+      }
+    }
+
+    async function callPing() {
+      try {
+        const res = await fetch('/ping');
+        if (res.ok) showAction('Ping: 200 OK', true);
+        else showAction('Ping: ' + res.status, false);
+      } catch (e) {
+        showAction('Ping failed', false);
+      }
+    }
+
+    // wire buttons
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('btn-health').addEventListener('click', callHealth);
+      document.getElementById('btn-ping').addEventListener('click', callPing);
+      updateClock();
+      setInterval(updateClock, 1000);
+      // initial meta + periodic refresh to keep base uptime in sync
+      refreshMeta();
+      setInterval(refreshMeta, 5000);
+    });
+  </script>
+</body>
+</html>

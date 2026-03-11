@@ -2,9 +2,12 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
+const path = require('path');
 
 const app = express();
 app.use(express.json());
+// Serve static UI files from /public
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const pkg = require('../package.json');
 
@@ -73,22 +76,17 @@ function verifyJwt(req) {
 app.get('/ping', (req, res) => res.sendStatus(200));
 
 // Root page: show running version and basic runtime info
+// Serve a static UI at root. The page will fetch /meta for dynamic info.
 app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
+// Provide runtime metadata for the UI to consume
+app.get('/meta', (req, res) => {
   const version = (pkg && pkg.version) ? pkg.version : 'dev';
   const now = new Date();
   const uptimeSec = Math.floor(process.uptime());
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(`<!doctype html>
-  <html>
-    <head><meta charset="utf-8"><title>NotificationPush - Status</title></head>
-    <body>
-      <h1>NotificationPush</h1>
-      <p><strong>Version:</strong> ${version}</p>
-      <p><strong>Now:</strong> ${now.toISOString()}</p>
-      <p><strong>Uptime (s):</strong> ${uptimeSec}</p>
-      <p><a href="/health">Health</a> • <a href="/ping">Ping</a></p>
-    </body>
-  </html>`);
+  res.json({ name: 'NotificationPush', version, now: now.toISOString(), uptimeSec });
 });
 
 app.get('/health', (req, res) => {
